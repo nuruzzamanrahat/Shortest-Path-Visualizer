@@ -1,6 +1,6 @@
 # Shortest Path Visualizer (Dijkstra's Algorithm)
 
-This is an interactive web application that finds the shortest path between nodes in a custom-built, weighted, undirected graph. The project visually demonstrates the step-by-step execution of Dijkstra's Algorithm, a key topic from Unit 4 of the Optimization Techniques syllabus.
+This is an interactive web application that finds the shortest path between nodes in a custom-built, weighted, undirected graph. The project visually demonstrates the step-by-step execution of Dijkstra's Algorithm, a key topic of the Optimization Techniques.
 
 This project is built using pure HTML, CSS (with Tailwind CSS for styling), and JavaScript.
 
