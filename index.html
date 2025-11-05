@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shortest Path Visualizer</title>
+
+    <!-- 1. Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- 2. Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        // 3. Configure Tailwind to use Inter font
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                },
+            },
+        };
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        
+        #graph-svg {
+            cursor: crosshair;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            background-color: #ffffff;
+            touch-action: none;
+        }
+
+        .node {
+            cursor: pointer;
+            transition: all 0.15s ease-in-out;
+        }
+        .node-circle {
+            stroke: #1f2937;
+            stroke-width: 2;
+        }
+        .node-text {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 14px;
+            fill: #1f2937;
+            pointer-events: none;
+            user-select: none;
+        }
+        .node:hover .node-circle {
+            fill: #dbeafe;
+        }
+        
+        .edge-line {
+            stroke: #4b5563;
+            stroke-width: 2;
+            cursor: pointer;
+        }
+        .edge-text-bg {
+            fill: #ffffff;
+            stroke: #ffffff;
+            stroke-width: 6px;
+            opacity: 0.8;
+        }
+        .edge-text {
+            font-size: 13px;
+            font-weight: 600;
+            fill: #1d4ed8;
+            pointer-events: none;
+            user-select: none;
+        }
+        .edge:hover .edge-line {
+            stroke: #ef4444;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            border-radius: 0.375rem;
+            border: 1px solid transparent;
+            transition: all 0.15s ease-in-out;
+            cursor: pointer;
+        }
+        .btn:focus {
+            outline: 2px solid transparent;
+            outline-offset: 2px;
+            box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #2563eb;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-primary {
+            color: #ffffff;
+            background-color: #16a34a;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background-color: #15803d;
+        }
+        .btn-danger {
+            color: #ffffff;
+            background-color: #dc2626;
+        }
+        .btn-danger:hover:not(:disabled) {
+            background-color: #b91c1c;
+        }
+        .btn-secondary {
+            color: #374151;
+            background-color: #ffffff;
+            border-color: #d1d5db;
+        }
+        .btn-secondary:hover:not(:disabled) {
+            background-color: #f9fafb;
+        }
+        .btn-secondary.active {
+            background-color: #dbeafe;
+            border-color: #3b82f6;
+            color: #1e40af;
+        }
+        .btn-info {
+            color: #ffffff;
+            background-color: #3b82f6;
+        }
+        .btn-info:hover:not(:disabled) {
+            background-color: #2563eb;
+        }
+        
+        select {
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            border: 1px solid #d1d5db;
+        }
+        
+        .node .node-circle.visited {
+            fill: #fef9c3;
+            stroke: #ca8a04;
+            transition: all 0.3s ease;
+        }
+        .node .node-circle.current {
+            fill: #fca5a5;
+            stroke: #b91c1c;
+            animation: pulse 1s infinite;
+        }
+        .edge .edge-line.path {
+            stroke: #2563eb;
+            stroke-width: 5;
+            transition: all 0.3s ease;
+        }
+        .edge .edge-line.path-alt {
+            stroke: #8b5cf6;
+            stroke-width: 5;
+            stroke-dasharray: 8, 4;
+            transition: all 0.3s ease;
+        }
+        .node .node-circle.path {
+            fill: #dbeafe;
+            stroke: #2563eb;
+            stroke-width: 4;
+        }
+        .node .node-circle.path-alt {
+            fill: #e9d5ff;
+            stroke: #8b5cf6;
+            stroke-width: 4;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        .path-card {
+            border: 2px solid #3b82f6;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            background-color: #eff6ff;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .path-card:hover {
+            background-color: #dbeafe;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .path-card.active {
+            background-color: #bfdbfe;
+            border-color: #1e40af;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+
+    </style>
+</head>
+
+<body class="min-h-screen p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto bg-white rounded-2xl shadow-xl p-6 md:p-8">
+        
+        <!-- Header -->
+        <header class="border-b border-gray-200 pb-4 mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">
+                Shortest Path Visualizer
+            </h1>
+            <p class="text-lg text-gray-600 mt-1">
+                Using Dijkstra's Algorithm with Multi-Path Detection
+            </p>
+        </header>
+
+        <!-- Controls -->
+        <div class="my-6 p-4 bg-gray-50 rounded-lg border border-gray-200 flex flex-wrap items-center gap-4">
+            <div class="flex items-center gap-2">
+                <strong class="text-gray-700">Mode:</strong>
+                <button id="btn-add-node" class="btn btn-secondary active">Add Node</button>
+                <button id="btn-add-edge" class="btn btn-secondary">Add Edge</button>
+                <button id="btn-delete" class="btn btn-secondary">Delete</button>
+            </div>
+            <div class="flex-grow border-t md:border-t-0 md:border-l border-gray-300 md:pl-4 md:ml-4 pt-4 md:pt-0 flex flex-wrap items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <label for="start-node" class="font-medium text-gray-700">Start:</label>
+                    <select id="start-node"></select>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label for="end-node" class="font-medium text-gray-700">End:</label>
+                    <select id="end-node"></select>
+                </div>
+                <button id="btn-find-path" class="btn btn-primary px-6 py-2 text-base font-semibold">
+                    Find Shortest Path
+                </button>
+                <button id="btn-clear" class="btn btn-danger ml-auto">Clear Graph</button>
+            </div>
+        </div>
+
+        <!-- Main Content: Graph and Results -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Graph Visualizer -->
+            <div class="lg:col-span-2">
+                <svg id="graph-svg" class="w-full h-[500px] md:h-[600px]"></svg>
+            </div>
+
+            <!-- Results Panel -->
+            <div class="lg:col-span-1 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Results</h2>
+                <div id="message-box" class="mb-4">
+                    <p class="text-gray-600">Click on the white area to add a node. Select "Add Edge" mode to connect nodes.</p>
+                </div>
+                
+                <div id="solution-path" class="mb-4"></div>
+                
+                <div id="multiple-paths-section" class="mb-4 hidden">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-2">All Shortest Paths:</h3>
+                    <div id="paths-list" class="max-h-[200px] overflow-y-auto"></div>
+                </div>
+                
+                <h3 class="text-xl font-semibold text-gray-700 mb-2">Distances from Start</h3>
+                <div class="overflow-y-auto max-h-[450px]">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-200">
+                            <tr>
+                                <th class="p-2">Node</th>
+                                <th class="p-2">Distance</th>
+                            </tr>
+                        </thead>
+                        <tbody id="distances-table" class="bg-white">
+                            <tr>
+                                <td colspan="2" class="p-2 text-gray-500 text-center">Run the algorithm to see distances.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- STATE MANAGEMENT ---
+        const state = {
+            nodes: [],
+            edges: [],
+            mode: 'addNode',
+            addEdgeStart: null,
+            nodeCounter: 0,
+            animationSpeed: 500,
+            allPaths: [],
+            currentPathIndex: 0,
+        };
+
+        // --- DOM ELEMENTS ---
+        const svg = document.getElementById('graph-svg');
+        const btnAddNode = document.getElementById('btn-add-node');
+        const btnAddEdge = document.getElementById('btn-add-edge');
+        const btnDelete = document.getElementById('btn-delete');
+        const btnFindPath = document.getElementById('btn-find-path');
+        const btnClear = document.getElementById('btn-clear');
+        const startNodeSelect = document.getElementById('start-node');
+        const endNodeSelect = document.getElementById('end-node');
+        const messageBox = document.getElementById('message-box');
+        const distancesTable = document.getElementById('distances-table');
+        const solutionPath = document.getElementById('solution-path');
+        const multiplePathsSection = document.getElementById('multiple-paths-section');
+        const pathsList = document.getElementById('paths-list');
+
+        // --- UTILITY FUNCTIONS ---
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+        
+        function getSVGPoint(e) {
+            const pt = svg.createSVGPoint();
+            pt.x = e.clientX;
+            pt.y = e.clientY;
+            return pt.matrixTransform(svg.getScreenCTM().inverse());
+        }
+
+        // --- MODE SELECTION ---
+        function setMode(newMode) {
+            state.mode = newMode;
+            state.addEdgeStart = null;
+            
+            document.querySelectorAll('.node-circle').forEach(c => c.classList.remove('current'));
+
+            btnAddNode.classList.toggle('active', newMode === 'addNode');
+            btnAddEdge.classList.toggle('active', newMode === 'addEdge');
+            btnDelete.classList.toggle('active', newMode === 'delete');
+            
+            svg.style.cursor = 'crosshair';
+            if (newMode === 'addEdge') {
+                svg.style.cursor = 'pointer';
+                showMessage('Click a node to start an edge.');
+            } else if (newMode === 'delete') {
+                svg.style.cursor = 'pointer';
+                showMessage('Click a node or edge to delete it.');
+            } else {
+                 showMessage('Click on the white area to add a node.');
+            }
+        }
+        
+        btnAddNode.onclick = () => setMode('addNode');
+        btnAddEdge.onclick = () => setMode('addEdge');
+        btnDelete.onclick = () => setMode('delete');
+
+        // --- EVENT HANDLERS ---
+        svg.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'svg') return;
+            if (state.mode === 'addNode') {
+                const { x, y } = getSVGPoint(e);
+                addNode(x, y);
+            }
+        });
+
+        btnClear.onclick = () => {
+            state.nodes = [];
+            state.edges = [];
+            state.nodeCounter = 0;
+            state.allPaths = [];
+            state.currentPathIndex = 0;
+            setMode('addNode');
+            render();
+        };
+
+        btnFindPath.onclick = async () => {
+            const startNodeId = startNodeSelect.value;
+            const endNodeId = endNodeSelect.value;
+            
+            if (!startNodeId || !endNodeId) {
+                showMessage('Please select a Start and End node.', 'error');
+                return;
+            }
+            if (startNodeId === endNodeId) {
+                showMessage('Start and End nodes must be different.', 'error');
+                return;
+            }
+            
+            clearVisuals();
+            btnFindPath.disabled = true;
+            await dijkstra(startNodeId, endNodeId);
+            btnFindPath.disabled = false;
+        };
+
+        // --- GRAPH MANIPULATION ---
+        function addNode(x, y) {
+            const newName = String.fromCharCode(65 + state.nodeCounter);
+            const newNode = {
+                id: `n${state.nodeCounter}`,
+                name: newName,
+                x: x,
+                y: y
+            };
+            state.nodes.push(newNode);
+            state.nodeCounter++;
+            render();
+        }
+
+        function handleNodeClick(nodeId) {
+            if (state.mode === 'delete') {
+                state.nodes = state.nodes.filter(n => n.id !== nodeId);
+                state.edges = state.edges.filter(e => e.from !== nodeId && e.to !== nodeId);
+                render();
+            } else if (state.mode === 'addEdge') {
+                if (!state.addEdgeStart) {
+                    state.addEdgeStart = nodeId;
+                    const node = state.nodes.find(n => n.id === nodeId);
+                    showMessage(`Start edge from ${node.name}. Click a second node to connect.`);
+                    document.getElementById(nodeId)?.querySelector('circle').classList.add('current');
+                } else {
+                    if (state.addEdgeStart === nodeId) {
+                        state.addEdgeStart = null;
+                        showMessage('Edge creation cancelled.');
+                        document.getElementById(nodeId)?.querySelector('circle').classList.remove('current');
+                        return;
+                    }
+
+                    const exists = state.edges.some(e => 
+                        (e.from === state.addEdgeStart && e.to === nodeId) || 
+                        (e.from === nodeId && e.to === state.addEdgeStart)
+                    );
+                    if (exists) {
+                        showMessage('An edge between these nodes already exists.', 'error');
+                        return;
+                    }
+
+                    const weightStr = prompt("Enter edge weight (positive integer):");
+                    const firstNodeId = state.addEdgeStart;
+                    
+                    if (weightStr === null) {
+                        showMessage('Edge creation cancelled.');
+                        document.getElementById(firstNodeId)?.querySelector('circle').classList.remove('current');
+                        state.addEdgeStart = null;
+                        return;
+                    }
+
+                    const weight = parseInt(weightStr, 10);
+                    
+                    if (weight > 0) {
+                        addEdge(firstNodeId, nodeId, weight);
+                        state.addEdgeStart = null;
+                        render();
+                        showMessage('Edge created successfully!', 'success');
+                    } else {
+                        showMessage('Invalid weight. Edge not created.', 'error');
+                        document.getElementById(firstNodeId)?.querySelector('circle').classList.remove('current');
+                        state.addEdgeStart = null;
+                    }
+                }
+            }
+        }
+
+        function addEdge(fromId, toId, weight) {
+            const newEdge = {
+                id: `e_${fromId}_${toId}`,
+                from: fromId,
+                to: toId,
+                weight: weight
+            };
+            state.edges.push(newEdge);
+        }
+
+        function handleEdgeClick(edgeId) {
+            if (state.mode === 'delete') {
+                state.edges = state.edges.filter(e => e.id !== edgeId);
+                render();
+            }
+        }
+
+        // --- DIJKSTRA'S ALGORITHM ---
+        async function dijkstra(startId, endId) {
+            showMessage('Starting Dijkstra\'s Algorithm...');
+            solutionPath.innerHTML = '';
+            multiplePathsSection.classList.add('hidden');
+            state.allPaths = [];
+            
+            const distances = {};
+            const prev = {}; // Now stores arrays of all previous nodes
+            const visited = new Set();
+            const pq = new Set();
+
+            for (const node of state.nodes) {
+                distances[node.id] = Infinity;
+                prev[node.id] = [];
+                pq.add(node.id);
+            }
+            distances[startId] = 0;
+
+            // Store distances globally for later use
+            state.distances = distances;
+            state.visited = visited;
+
+            renderDistances(distances, visited);
+            await sleep(state.animationSpeed);
+
+            while (pq.size > 0) {
+                let u = null;
+                let minDis = Infinity;
+                for (const nodeId of pq) {
+                    if (distances[nodeId] < minDis) {
+                        minDis = distances[nodeId];
+                        u = nodeId;
+                    }
+                }
+
+                if (u === null || distances[u] === Infinity) {
+                    break;
+                }
+                
+                pq.delete(u);
+                visited.add(u);
+
+                highlightNode(u, 'current');
+                showMessage(`Visiting node ${state.nodes.find(n => n.id === u).name}.`);
+                await sleep(state.animationSpeed);
+                
+                if (u === endId) {
+                    showMessage(`Reached destination node ${state.nodes.find(n => n.id === u).name}!`, 'success');
+                    await sleep(state.animationSpeed);
+                    break;
+                }
+
+                const neighbors = [];
+                for (const edge of state.edges) {
+                    let v = null;
+                    if (edge.from === u && pq.has(edge.to)) v = edge.to;
+                    else if (edge.to === u && pq.has(edge.from)) v = edge.from;
+
+                    if (v) {
+                        neighbors.push({ node: v, weight: edge.weight });
+                    }
+                }
+
+                for (const { node: v, weight } of neighbors) {
+                    const alt = distances[u] + weight;
+                    if (alt < distances[v]) {
+                        distances[v] = alt;
+                        prev[v] = [u]; // New shortest path found
+                        
+                        showMessage(`Updating distance to ${state.nodes.find(n => n.id === v).name}: ${alt}`);
+                        highlightEdge(u, v, 'visited');
+                        renderDistances(distances, visited);
+                        await sleep(state.animationSpeed);
+                        highlightEdge(u, v, '');
+                    } else if (alt === distances[v] && distances[v] !== Infinity) {
+                        // Alternative path with same distance
+                        prev[v].push(u);
+                        showMessage(`Found alternative path to ${state.nodes.find(n => n.id === v).name}`);
+                        await sleep(state.animationSpeed / 2);
+                    }
+                }
+                
+                highlightNode(u, 'visited');
+            }
+            
+            if (distances[endId] === Infinity) {
+                 showMessage('No path found to the end node.', 'error');
+                 renderDistances(distances, visited);
+                 return;
+            }
+            
+            // Find all shortest paths using DFS
+            state.allPaths = findAllPaths(prev, startId, endId);
+            
+            if (state.allPaths.length === 1) {
+                // Single path
+                displaySinglePath(state.allPaths[0], distances[endId]);
+            } else {
+                // Multiple paths
+                displayMultiplePaths(state.allPaths, distances[endId]);
+            }
+        }
+
+        // --- FIND ALL PATHS (DFS) ---
+        function findAllPaths(prev, startId, endId) {
+            const allPaths = [];
+            
+            function dfs(current, path) {
+                if (current === startId) {
+                    allPaths.push([...path, current].reverse());
+                    return;
+                }
+                
+                for (const prevNode of prev[current]) {
+                    dfs(prevNode, [...path, current]);
+                }
+            }
+            
+            dfs(endId, []);
+            return allPaths;
+        }
+
+        // --- DISPLAY FUNCTIONS ---
+        function displaySinglePath(path, cost) {
+            const pathNames = path.map(id => state.nodes.find(n => n.id === id).name).join(' → ');
+            solutionPath.innerHTML = `
+                <h3 class="text-xl font-semibold text-gray-700 mb-2">Shortest Path:</h3>
+                <p class="text-lg font-medium text-blue-600">${pathNames}</p>
+                <p class="text-2xl font-bold text-gray-800 mt-2">Total Cost: ${cost}</p>
+            `;
+            
+            visualizePath(path, 'path');
+            
+            // Update distances table with path highlighting
+            renderDistances(state.distances, state.visited, path);
+            
+            showMessage('Shortest path found!', 'success');
+        }
+
+        function displayMultiplePaths(paths, cost) {
+            solutionPath.innerHTML = `
+                <h3 class="text-xl font-semibold text-gray-700 mb-2">Multiple Shortest Paths Found!</h3>
+                <p class="text-lg font-medium text-purple-600">Found ${paths.length} paths with cost ${cost}</p>
+                <p class="text-sm text-gray-600 mt-1">Click on a path below to view it on the graph</p>
+            `;
+            
+            multiplePathsSection.classList.remove('hidden');
+            pathsList.innerHTML = '';
+            
+            paths.forEach((path, index) => {
+                const pathNames = path.map(id => state.nodes.find(n => n.id === id).name).join(' → ');
+                const pathCard = document.createElement('div');
+                pathCard.className = 'path-card' + (index === 0 ? ' active' : '');
+                pathCard.innerHTML = `
+                    <div class="font-semibold text-gray-800 mb-1">Path ${index + 1}:</div>
+                    <div class="text-blue-600">${pathNames}</div>
+                `;
+                pathCard.onclick = () => selectPath(index);
+                pathsList.appendChild(pathCard);
+            });
+            
+            // Show first path by default
+            visualizePath(paths[0], 'path');
+            state.currentPathIndex = 0;
+            showMessage(`Showing path 1 of ${paths.length}`, 'success');
+        }
+
+        function selectPath(index) {
+            state.currentPathIndex = index;
+            
+            // Update active card
+            document.querySelectorAll('.path-card').forEach((card, i) => {
+                card.classList.toggle('active', i === index);
+            });
+            
+            // Clear previous visualization
+            document.querySelectorAll('.node-circle').forEach(c => {
+                c.classList.remove('path', 'path-alt');
+            });
+            document.querySelectorAll('.edge-line').forEach(l => {
+                l.classList.remove('path', 'path-alt');
+            });
+            
+            // Visualize selected path
+            visualizePath(state.allPaths[index], 'path');
+            
+            // Update distances table with selected path highlighting
+            renderDistances(state.distances, state.visited, state.allPaths[index]);
+            
+            showMessage(`Showing path ${index + 1} of ${state.allPaths.length}`, 'success');
+        }
+
+        function visualizePath(path, className) {
+            for (let i = 0; i < path.length; i++) {
+                highlightNode(path[i], className);
+                if (i > 0) {
+                    highlightEdge(path[i], path[i-1], className);
+                }
+            }
+        }
+
+        // --- RENDERING ---
+        function render() {
+            const prevAddEdgeStart = state.addEdgeStart;
+            svg.innerHTML = '';
+
+            const edgeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            state.edges.forEach(edge => {
+                const fromNode = state.nodes.find(n => n.id === edge.from);
+                const toNode = state.nodes.find(n => n.id === edge.to);
+                if (!fromNode || !toNode) return;
+
+                const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                g.setAttribute('class', 'edge');
+                g.setAttribute('id', edge.id);
+                g.onclick = (e) => {
+                    e.stopPropagation();
+                    handleEdgeClick(edge.id);
+                };
+
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('class', 'edge-line');
+                line.setAttribute('x1', fromNode.x);
+                line.setAttribute('y1', fromNode.y);
+                line.setAttribute('x2', toNode.x);
+                line.setAttribute('y2', toNode.y);
+                g.appendChild(line);
+
+                const midX = (fromNode.x + toNode.x) / 2;
+                const midY = (fromNode.y + toNode.y) / 2;
+                
+                const textBg = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                textBg.setAttribute('class', 'edge-text-bg');
+                textBg.setAttribute('x', midX);
+                textBg.setAttribute('y', midY);
+                textBg.setAttribute('text-anchor', 'middle');
+                textBg.setAttribute('dominant-baseline', 'middle');
+                textBg.textContent = edge.weight;
+                g.appendChild(textBg);
+
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('class', 'edge-text');
+                text.setAttribute('x', midX);
+                text.setAttribute('y', midY);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('dominant-baseline', 'middle');
+                text.textContent = edge.weight;
+                g.appendChild(text);
+
+                edgeGroup.appendChild(g);
+            });
+            svg.appendChild(edgeGroup);
+            
+            const nodeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            state.nodes.forEach(node => {
+                const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                g.setAttribute('class', 'node');
+                g.setAttribute('id', node.id);
+                g.setAttribute('transform', `translate(${node.x}, ${node.y})`);
+                g.onclick = (e) => {
+                    e.stopPropagation();
+                    handleNodeClick(node.id);
+                };
+
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('class', 'node-circle');
+                circle.setAttribute('r', 18);
+                circle.setAttribute('fill', '#fff');
+                g.appendChild(circle);
+
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('class', 'node-text');
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('dominant-baseline', 'middle');
+                text.textContent = node.name;
+                g.appendChild(text);
+                
+                nodeGroup.appendChild(g);
+            });
+            svg.appendChild(nodeGroup);
+            
+            if (prevAddEdgeStart) {
+                document.getElementById(prevAddEdgeStart)?.querySelector('circle').classList.add('current');
+            }
+            
+            updateSelects();
+        }
+
+        function updateSelects() {
+            const startVal = startNodeSelect.value;
+            const endVal = endNodeSelect.value;
+            
+            startNodeSelect.innerHTML = '<option value="">Select</option>';
+            endNodeSelect.innerHTML = '<option value="">Select</option>';
+
+            state.nodes.forEach(node => {
+                const startOption = document.createElement('option');
+                startOption.value = node.id;
+                startOption.textContent = node.name;
+                startNodeSelect.appendChild(startOption);
+
+                const endOption = document.createElement('option');
+                endOption.value = node.id;
+                endOption.textContent = node.name;
+                endNodeSelect.appendChild(endOption);
+            });
+            
+            startNodeSelect.value = state.nodes.find(n => n.id === startVal) ? startVal : '';
+            endNodeSelect.value = state.nodes.find(n => n.id === endVal) ? endVal : '';
+        }
+        
+        function renderDistances(distances, visited, highlightPath = []) {
+            distancesTable.innerHTML = '';
+            if (Object.keys(distances).length === 0) {
+                distancesTable.innerHTML = '<tr><td colspan="2" class="p-2 text-gray-500 text-center">Run the algorithm to see distances.</td></tr>';
+                return;
+            }
+            
+            const startNodeId = startNodeSelect.value;
+            const sortedNodes = [...state.nodes].sort((a, b) => a.name.localeCompare(b.name));
+            
+            for (const node of sortedNodes) {
+                const dist = distances[node.id];
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-gray-200';
+                
+                // Priority: Path nodes (blue) > Start node (green) > Visited (yellow)
+                if (highlightPath.includes(node.id)) {
+                    tr.className += ' bg-blue-100 font-semibold';
+                } else if (node.id === startNodeId) {
+                    tr.className += ' bg-green-100';
+                } else if (visited.has(node.id)) {
+                    tr.className += ' bg-yellow-50';
+                }
+                
+                const tdNode = document.createElement('td');
+                tdNode.className = 'p-2 font-medium';
+                tdNode.textContent = node.name;
+                tr.appendChild(tdNode);
+                
+                const tdDist = document.createElement('td');
+                tdDist.className = 'p-2';
+                tdDist.textContent = dist === Infinity ? '∞' : dist;
+                tr.appendChild(tdDist);
+                
+                distancesTable.appendChild(tr);
+            }
+        }
+        
+        function showMessage(msg, type = 'info') {
+            messageBox.innerHTML = '';
+            let colorClass = 'text-gray-600';
+            if (type === 'error') colorClass = 'text-red-600 font-medium';
+            if (type === 'success') colorClass = 'text-green-600 font-medium';
+            
+            const p = document.createElement('p');
+            p.className = colorClass;
+            p.textContent = msg;
+            messageBox.appendChild(p);
+        }
+        
+        function highlightNode(nodeId, className) {
+            const nodeEl = document.getElementById(nodeId);
+            if (!nodeEl) return;
+            const circle = nodeEl.querySelector('.node-circle');
+            circle.classList.remove('current', 'visited', 'path', 'path-alt');
+            if (className) {
+                circle.classList.add(className);
+            }
+        }
+        
+        function highlightEdge(nodeId1, nodeId2, className) {
+            const edgeEl = document.getElementById(`e_${nodeId1}_${nodeId2}`) || document.getElementById(`e_${nodeId2}_${nodeId1}`);
+            if (!edgeEl) return;
+            const line = edgeEl.querySelector('.edge-line');
+            line.classList.remove('visited', 'path', 'path-alt');
+            if (className) {
+                line.classList.add(className);
+            }
+        }
+        
+        function clearVisuals() {
+            document.querySelectorAll('.node-circle').forEach(c => c.classList.remove('current', 'visited', 'path', 'path-alt'));
+            document.querySelectorAll('.edge-line').forEach(l => l.classList.remove('visited', 'path', 'path-alt'));
+            solutionPath.innerHTML = '';
+            multiplePathsSection.classList.add('hidden');
+            distancesTable.innerHTML = '<tr><td colspan="2" class="p-2 text-gray-500 text-center">Run the algorithm to see distances.</td></tr>';
+        }
+
+        // --- INITIALIZATION ---
+        setMode('addNode');
+        render();
+
+    </script>
+</body>
+</html>
