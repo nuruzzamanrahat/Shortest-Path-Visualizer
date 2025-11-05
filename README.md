@@ -6,8 +6,7 @@ This project is built using pure HTML, CSS (with Tailwind CSS for styling), and 
 
 ## Live Demo & Usage
 
-- **Live Demo**: [YOUR-LIVE-DEMO-LINK-HERE]
-
+- **Live Demo**: [► View Live Demo](https://nuruzzamanrahat.github.io/Shortest-Path-Visualizer/)
 ## Core Concepts
 
 ### 1. The Shortest Path Problem
